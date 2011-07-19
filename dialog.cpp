@@ -271,9 +271,9 @@
  {
 		
 		//Initialize imaging
-//		m_porta->stopImage();
+		m_porta->stopImage();
 		m_porta->initImagingMode((imagingMode)RfMode); 
-	//	m_porta->setParam(prmRfMode, 2);  //2 gives B-mode and rf images
+		m_porta->setParam(prmRfMode, 2);  //2 gives B-mode and rf images
 		
 		//variables related to angles stepped
 		numAngles = 25;   //must be odd
@@ -297,9 +297,14 @@
         int w = m_porta->getParam(prmRfNumLines);
         int h = m_porta->getParam(prmRfNumSamples);
         int szFrm = (w * h * (16 / 8));   //(16 bit ints per sample/8 bits per char)*samples*lines
-		rfBuffer = new unsigned char[szFrm*fpa*numAngles];
-
-
+		try{
+		rfBuffer = new unsigned char[szFrm*fpa*numAngles];  
+		}
+		catch( std::bad_alloc&)
+		{
+			statusBox->setText("Unable to allocate memory for saving RF data");
+			return;
+		}
 
 		//center the motor then move it ten steps off center
 		 m_porta->goToPosition(centralAngle);
@@ -308,32 +313,39 @@
 		 for(int i = 0; i < halfAngles; i ++ )
 			 m_porta->stepMotor(0, steps);
 
+		m_porta->runImage();
+		m_porta->stopImage();
 		
-	//	m_porta->runImage();
-	//	m_porta->stopImage();
-		
-/*
+
 		//Acquire a manual volume	
-		int slpTime = 50;
-			for(int a = 0; a<numAngles;a++)
-				{
+		//Figure out sleep time necessary to get the requisite frames per angle
+		int minTime = 50;
+		while(m_porta->getFrameCount(1) < fpa){
+				m_porta->runImage();
+				::Sleep(minTime);  //1 second of data
+				m_porta->stopImage();
+				minTime *=2;	
+				}
+
+
+		for(int a = 0; a<numAngles;a++){
 			
 				Sleep(200); 
-			
+				int slpTime = minTime;
+				m_porta->runImage();
+				::Sleep(slpTime); 
+				m_porta->stopImage();
+
 				while(m_porta->getFrameCount(1) < fpa){
 				m_porta->runImage();
-				::Sleep(slpTime);  //1 second of data
+				::Sleep(500);  //500 ms of data?
 				m_porta->stopImage();
-				slpTime *=2;	
 				}
 				
-				slpTime = 50;
-				
-	
-		*/
+					
 			// remember +4 when getting data from the cine b/c of the frame header (counter)
 			
-			    /*
+			 /*
               
 			int counter = 0;
 			for (int j=0; j<displayH; j++)  //compress the data
@@ -341,7 +353,7 @@
 				for(int i= 0; i<displayW; i++) 
 					{
 					//bModeImage->setPixel(i,j,*(buffer+counter) );
-						bModeImage->setPixel(i,j,*(m_porta->getFrameAddress(0, 0 ) + 4 +counter) );
+					bModeImage->setPixel(i,j,*(m_porta->getFrameAddress(0, 0 ) + 4 +counter) );
 					counter++;
 					}
 				}
@@ -351,7 +363,7 @@
 			bModeDisplay->update();
 			//this->repaint();
 			*/
-	/*		for(int i = 0;i < fpa; i++)
+			for(int i = 0;i < fpa; i++)
 			{
 				memcpy(rfBuffer +i*szFrm + a*fpa*szFrm, m_porta->getFrameAddress(1, i ) + 4, szFrm);
 			}
@@ -359,7 +371,7 @@
 			m_porta -> initImagingMode((imagingMode)RfMode);  //resets the cine buffer
 			m_porta->setParam(prmRfMode, 2);  //2 gives B-mode and rf images
 		
-
+		m_porta->stepMotor(1, steps);
  }
         // write to file
 		fNameString = fileNameBox->text();
@@ -371,7 +383,7 @@
                 delete[] rfBuffer;
             }
             return;
-        }
+        } 
 
 		
 		fwrite(&w,sizeof(int), 1, fp);
@@ -380,13 +392,13 @@
 		fwrite(&numAngles, sizeof(int), 1, fp);
 		fwrite(&degPerAngle, sizeof(double), 1, fp);
         fwrite(rfBuffer, szFrm*fpa*numAngles, 1, fp);
-        fclose(fp);
+        fclose(fp); 
 
         if (rfBuffer)
         {
             delete[] rfBuffer;
         }
-		statusBox->append("Volume collection complete"); */
+		statusBox->append("Volume collection Successful");
  }
 
 
@@ -509,7 +521,7 @@ switch( index)
 		
 		 //center the motor
 		 m_porta->goToPosition(centralAngle);
-    	m_porta->runImage();
+    	 m_porta->runImage();
 	
 		bModeTimer->start(75);  
  }
