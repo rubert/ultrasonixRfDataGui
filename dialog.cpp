@@ -72,6 +72,7 @@
      bModeOffButton = new QPushButton(tr("Stop B-mode Imaging") );
 	 bModeDisplay = new QLabel;
 	 bModeTimer = new QTimer;
+	 volumeRefreshTimer = new QTimer;
 	 strainTimer = new QTimer;
 	 bModeImage = new QImage(displayW,displayH, QImage::Format_Indexed8);
 	 bModeImage->setNumColors(256);
@@ -199,8 +200,9 @@
 	/////							/////
 
     connect(rfVolumeButton, SIGNAL(clicked() ), this, SLOT(collectRfVolume() ) ) ;
-	connect(this, SIGNAL( acquireNextAngle() ), this, SLOT( acquireAngleInRfVolume() ) );
+	connect(volumeRefreshTimer, SIGNAL( timeout() ), this, SLOT( acquireAngleInRfVolume() ) );
 	connect(this, SIGNAL( volumeAcquisitionComplete() ), this, SLOT( writeRfVolume() ) );
+	connect(this, SIGNAL( updateImageWhileVolumeAcquisition() ), this, SLOT( repaint() ) );
 
 
 	connect(bModeOnButton, SIGNAL(clicked() ), this, SLOT(stopStrainTimer() ) );
@@ -334,13 +336,14 @@
 				currentAngleInVolume = -1;
 				statusBox->setText("Rf data Acquisition commenced \n" );
 
-				emit acquireNextAngle();
+				volumeRefreshTimer->start(400);
 				
  }
 
  
  void Dialog::acquireAngleInRfVolume(){
 				
+				volumeRefreshTimer->stop();
 				Sleep(200); 
 				currentAngleInVolume+=1;
 				int slpTime = minTime;
@@ -356,7 +359,7 @@
 			
 					
 			// remember +4 when getting data from the cine b/c of the frame header (counter)
-   			/*int counter = 0;
+   			int counter = 0;
 			for (int j=0; j<displayH; j++)  //compress the data
 				{
 				for(int i= 0; i<displayW; i++) 
@@ -365,11 +368,12 @@
 					counter++;
 					}
 				}
-
+		
+	
 			QPixmap pix = QPixmap::fromImage(*bModeImage);
 			bModeDisplay->setPixmap(pix);
 			bModeDisplay->update();
-			this->repaint(); */
+			emit updateImageWhileVolumeAcquisition(); 
 			
 			for(int i = 0;i < fpa; i++)
 			{
@@ -382,7 +386,7 @@
 		m_porta->stepMotor(1, steps);
 		
 		if(currentAngleInVolume < numAngles-1)
-			emit acquireNextAngle();
+			volumeRefreshTimer->start(400);
 		else
 			emit volumeAcquisitionComplete();
 

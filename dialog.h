@@ -58,8 +58,8 @@ protected:
 
 
 signals:
-	void acquireNextAngle(void);
 	void volumeAcquisitionComplete(void);
+	void updateImageWhileVolumeAcquisition(void);
 
  private slots:
 
@@ -133,7 +133,7 @@ signals:
 	int displayH;
 	//For holding the B-mode image
 	unsigned char* buffer;
-	QTimer *bModeTimer;
+	QTimer *bModeTimer, *volumeRefreshTimer;
 	unsigned char* rfBuffer;
 
 	//For producing strain image
