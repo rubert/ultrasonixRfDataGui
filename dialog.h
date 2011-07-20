@@ -68,6 +68,7 @@ signals:
 	 void collectRfVolume();
 	 void acquireAngleInRfVolume();
 	 void writeRfVolume();
+	 void showImageDuringVolumeSlot();
 
 	 void changeFocusDepth(int);
 	 void changeImageDepth(int);
@@ -129,6 +130,7 @@ signals:
 	QComboBox *angleBox;
 
 	//Strain/B-mode image
+	QImage *volumeImage;
 	int displayW; 
 	int displayH;
 	//For holding the B-mode image

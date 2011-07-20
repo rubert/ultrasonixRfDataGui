@@ -89,6 +89,8 @@
 	buffer = new unsigned char[szFrm];
 	rfBuffer = NULL; //Initialize RF buffer to NULL
 
+	
+
 	//////							 //////
 	//////							 //////
 	/////							 /////
@@ -202,7 +204,7 @@
     connect(rfVolumeButton, SIGNAL(clicked() ), this, SLOT(collectRfVolume() ) ) ;
 	connect(volumeRefreshTimer, SIGNAL( timeout() ), this, SLOT( acquireAngleInRfVolume() ) );
 	connect(this, SIGNAL( volumeAcquisitionComplete() ), this, SLOT( writeRfVolume() ) );
-	connect(this, SIGNAL( updateImageWhileVolumeAcquisition() ), this, SLOT( repaint() ) );
+	connect(this, SIGNAL( updateImageWhileVolumeAcquisition() ), this, SLOT( showImageDuringVolumeSlot() ) );
 
 
 	connect(bModeOnButton, SIGNAL(clicked() ), this, SLOT(stopStrainTimer() ) );
@@ -280,8 +282,9 @@
 		//Initialize imaging
 		m_porta->stopImage();
 		m_porta->initImagingMode((imagingMode)RfMode); 
-		m_porta->setParam(prmRfMode, 2);  //2 gives B-mode and rf images
+		m_porta->setParam(prmRfMode, 1);  //2 gives B-mode and rf images, 1 gives rf only, 0 gives B only
 		
+
 		//variables related to angles stepped
 		numAngles = 25;   //must be odd
 		halfAngles = 12;   //(numAngles - 1)/2
@@ -314,7 +317,16 @@
 			statusBox->setText("Unable to allocate memory for saving RF data");
 			return;
 		}   
-		//center the motor then move it ten steps off center
+
+	 volumeImage = new QImage(w,h, QImage::Format_Indexed8);
+	 volumeImage->setNumColors(256);
+	 //Assign an RGB value to the 256 indexes in the image color table
+	 for ( int i = 0; i < 256; i++ ) 
+	 {
+	volumeImage->setColor( i, qRgb( i, i, i )) ;
+	}
+	
+	 //center the motor then move it ten steps off center
 		 m_porta->goToPosition(centralAngle);
 		
 		//make the sweep symmetric, the central angle will look better than the others
@@ -344,7 +356,11 @@
  void Dialog::acquireAngleInRfVolume(){
 				
 				volumeRefreshTimer->stop();
-				Sleep(200); 
+				//Initialize imaging
+				m_porta->stopImage();
+				m_porta->initImagingMode((imagingMode)RfMode); 
+				m_porta->setParam(prmRfMode, 1);  //2 gives B-mode and rf images, 1 gives rf only, 0 gives B only
+								
 				currentAngleInVolume+=1;
 				int slpTime = minTime;
 				m_porta->runImage();
@@ -357,32 +373,15 @@
 				m_porta->stopImage();
 				}
 			
-					
-			// remember +4 when getting data from the cine b/c of the frame header (counter)
-   			int counter = 0;
-			for (int j=0; j<displayH; j++)  //compress the data
-				{
-				for(int i= 0; i<displayW; i++) 
-					{
-					bModeImage->setPixel(i,j,*(m_porta->getFrameAddress(0, 0 ) + 4 +counter) );
-					counter++;
-					}
-				}
-		
-	
-			QPixmap pix = QPixmap::fromImage(*bModeImage);
-			bModeDisplay->setPixmap(pix);
-			bModeDisplay->update();
-			emit updateImageWhileVolumeAcquisition(); 
 			
+	
 			for(int i = 0;i < fpa; i++)
 			{
 				memcpy(rfBuffer +i*szFrm + currentAngleInVolume*fpa*szFrm, m_porta->getFrameAddress(1, i ) + 4, szFrm);
 			}
 
-			m_porta -> initImagingMode((imagingMode)RfMode);  //resets the cine buffer
-			m_porta->setParam(prmRfMode, 2);  //2 gives B-mode and rf images
-		
+					
+		emit updateImageWhileVolumeAcquisition();
 		m_porta->stepMotor(1, steps);
 		
 		if(currentAngleInVolume < numAngles-1)
@@ -392,6 +391,33 @@
 
  }
  
+ void Dialog::showImageDuringVolumeSlot(){
+
+	m_porta->stopImage();
+	if( m_porta->initImagingMode((imagingMode)BMode)  )
+			statusBox->setText("B-mode imaging activated");
+	m_porta->setDisplayDimensions(0,displayW, displayH);
+	m_porta->runImage();
+	Sleep(300); //Sleeping for 1/3 of a second
+	
+	m_porta->getBwImage(0, buffer, 0);    //0 for B-mode, pointer to Buffer, 0 to not apply colormap       
+	int counter = 0;
+	for (int j=0; j<displayH; j++)  //compress the data
+	{
+		for(int i= 0; i<displayW; i++) 
+			{
+			bModeImage->setPixel(i,j,*(buffer+counter) );
+			
+			counter++;
+			}
+		}
+
+		QPixmap pix = QPixmap::fromImage(*bModeImage);
+		bModeDisplay->setPixmap(pix);
+
+ }
+
+
  void Dialog::writeRfVolume()   
  {
 	  // write to file
