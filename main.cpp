@@ -6,5 +6,6 @@
      QApplication app(argc, argv);
 
      Dialog dialog;
-     return dialog.exec();
+	 dialog.show();
+     return app.exec();
  }

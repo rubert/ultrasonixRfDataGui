@@ -57,11 +57,17 @@ protected:
      void closeEvent(QCloseEvent *event);
 
 
+signals:
+	void acquireNextAngle(void);
+	void volumeAcquisitionComplete(void);
+
  private slots:
 
 
 	 
 	 void collectRfVolume();
+	 void acquireAngleInRfVolume();
+	 void writeRfVolume();
 
 	 void changeFocusDepth(int);
 	 void changeImageDepth(int);
@@ -117,6 +123,7 @@ protected:
 	int fov;
 	int centralAngle;
 	int numLines;
+	int currentAngleInVolume, minTime, szFrm;
 
 	QLabel *angleLabel;
 	QComboBox *angleBox;
@@ -127,7 +134,7 @@ protected:
 	//For holding the B-mode image
 	unsigned char* buffer;
 	QTimer *bModeTimer;
-	
+	unsigned char* rfBuffer;
 
 	//For producing strain image
 //	paramStruct blockMatchParams;

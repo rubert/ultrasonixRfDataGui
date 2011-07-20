@@ -86,6 +86,7 @@
 
 	int szFrm = (displayW * displayH * (8 / 8));   //(16 bit ints/8 bits per char)*10 frames per angle
 	buffer = new unsigned char[szFrm];
+	rfBuffer = NULL; //Initialize RF buffer to NULL
 
 	//////							 //////
 	//////							 //////
@@ -197,7 +198,11 @@
 	/////							/////
 	/////							/////
 
-    connect(rfVolumeButton, SIGNAL(clicked() ), this, SLOT(collectRfVolume() ) );
+    connect(rfVolumeButton, SIGNAL(clicked() ), this, SLOT(collectRfVolume() ) ) ;
+	connect(this, SIGNAL( acquireNextAngle() ), this, SLOT( acquireAngleInRfVolume() ) );
+	connect(this, SIGNAL( volumeAcquisitionComplete() ), this, SLOT( writeRfVolume() ) );
+
+
 	connect(bModeOnButton, SIGNAL(clicked() ), this, SLOT(stopStrainTimer() ) );
 	connect(bModeOnButton, SIGNAL(clicked() ), this, SLOT(startBModeTimer() ) );
 	connect(bModeOffButton, SIGNAL(clicked() ), this, SLOT(stopBModeTimer() ) );
@@ -293,10 +298,12 @@
 		
 
         //Get size of Image, initialize buffer for image storage
-		unsigned char* rfBuffer = 0;
+		if(rfBuffer != NULL)
+			delete rfBuffer;
+
         int w = m_porta->getParam(prmRfNumLines);
         int h = m_porta->getParam(prmRfNumSamples);
-        int szFrm = (w * h * (16 / 8));   //(16 bit ints per sample/8 bits per char)*samples*lines
+        szFrm = (w * h * (16 / 8));   //(16 bit ints per sample/8 bits per char)*samples*lines
 		try{
 		rfBuffer = new unsigned char[szFrm*fpa*numAngles];  
 		}
@@ -304,8 +311,7 @@
 		{
 			statusBox->setText("Unable to allocate memory for saving RF data");
 			return;
-		}
-
+		}   
 		//center the motor then move it ten steps off center
 		 m_porta->goToPosition(centralAngle);
 		
@@ -313,13 +319,11 @@
 		 for(int i = 0; i < halfAngles; i ++ )
 			 m_porta->stepMotor(0, steps);
 
-		m_porta->runImage();
-		m_porta->stopImage();
 		
 
 		//Acquire a manual volume	
 		//Figure out sleep time necessary to get the requisite frames per angle
-		int minTime = 50;
+		minTime = 50;
 		while(m_porta->getFrameCount(1) < fpa){
 				m_porta->runImage();
 				::Sleep(minTime);  //1 second of data
@@ -327,10 +331,18 @@
 				minTime *=2;	
 				}
 
+				currentAngleInVolume = -1;
+				statusBox->setText("Rf data Acquisition commenced \n" );
 
-		for(int a = 0; a<numAngles;a++){
-			
+				emit acquireNextAngle();
+				
+ }
+
+ 
+ void Dialog::acquireAngleInRfVolume(){
+				
 				Sleep(200); 
+				currentAngleInVolume+=1;
 				int slpTime = minTime;
 				m_porta->runImage();
 				::Sleep(slpTime); 
@@ -341,18 +353,14 @@
 				::Sleep(500);  //500 ms of data?
 				m_porta->stopImage();
 				}
-				
+			
 					
 			// remember +4 when getting data from the cine b/c of the frame header (counter)
-			
-			 /*
-              
-			int counter = 0;
+   			/*int counter = 0;
 			for (int j=0; j<displayH; j++)  //compress the data
 				{
 				for(int i= 0; i<displayW; i++) 
 					{
-					//bModeImage->setPixel(i,j,*(buffer+counter) );
 					bModeImage->setPixel(i,j,*(m_porta->getFrameAddress(0, 0 ) + 4 +counter) );
 					counter++;
 					}
@@ -361,19 +369,28 @@
 			QPixmap pix = QPixmap::fromImage(*bModeImage);
 			bModeDisplay->setPixmap(pix);
 			bModeDisplay->update();
-			//this->repaint();
-			*/
+			this->repaint(); */
+			
 			for(int i = 0;i < fpa; i++)
 			{
-				memcpy(rfBuffer +i*szFrm + a*fpa*szFrm, m_porta->getFrameAddress(1, i ) + 4, szFrm);
+				memcpy(rfBuffer +i*szFrm + currentAngleInVolume*fpa*szFrm, m_porta->getFrameAddress(1, i ) + 4, szFrm);
 			}
 
 			m_porta -> initImagingMode((imagingMode)RfMode);  //resets the cine buffer
 			m_porta->setParam(prmRfMode, 2);  //2 gives B-mode and rf images
 		
 		m_porta->stepMotor(1, steps);
+		
+		if(currentAngleInVolume < numAngles-1)
+			emit acquireNextAngle();
+		else
+			emit volumeAcquisitionComplete();
+
  }
-        // write to file
+ 
+ void Dialog::writeRfVolume()   
+ {
+	  // write to file
 		fNameString = fileNameBox->text();
 		FILE* fp = fopen(fNameString.toLocal8Bit().data(), "wb");
         if (!fp)
@@ -385,6 +402,8 @@
             return;
         } 
 
+		int w = m_porta->getParam(prmRfNumLines);
+        int h = m_porta->getParam(prmRfNumSamples);
 		
 		fwrite(&w,sizeof(int), 1, fp);
 		fwrite(&h, sizeof(int), 1, fp);
@@ -399,8 +418,8 @@
             delete[] rfBuffer;
         }
 		statusBox->append("Volume collection Successful");
- }
 
+ }
 
 
  void Dialog::changeFocusDepth(int index)
