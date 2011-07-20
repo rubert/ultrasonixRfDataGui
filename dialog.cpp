@@ -286,9 +286,9 @@
 		
 
 		//variables related to angles stepped
-		numAngles = 25;   //must be odd
-		halfAngles = 12;   //(numAngles - 1)/2
-		fpa = 20;
+		numAngles = 43;   //must be odd
+		halfAngles = 21;   //(numAngles - 1)/2
+		fpa = 5;
 
 		
 		
@@ -298,7 +298,7 @@
 		m_porta->getProbeInfo(nfo);
 		degPerStep = (double)nfo.motorFov / (double)nfo.motorSteps;
 		degPerStep = degPerStep/1000.0;
-		steps = 12; //there is a minimum number of steps. I believe it is 8
+		steps = 8; //there is a minimum number of steps. I believe it is 8
 		degPerAngle = (double)steps*degPerStep;
 		
 
@@ -420,6 +420,11 @@
 
  void Dialog::writeRfVolume()   
  {
+
+		m_porta->initImagingMode((imagingMode)RfMode); 
+		m_porta->setParam(prmRfMode, 1);  //2 gives B-mode and rf images, 1 gives rf only, 0 gives B only
+				
+
 	  // write to file
 		fNameString = fileNameBox->text();
 		FILE* fp = fopen(fNameString.toLocal8Bit().data(), "wb");
